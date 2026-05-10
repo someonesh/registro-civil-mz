@@ -1,0 +1,8 @@
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/app/**/__pycache__/
+backend/pdfs/
+backend/testar_*.py
+*.pyc
+node_modules/
