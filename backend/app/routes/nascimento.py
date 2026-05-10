@@ -192,6 +192,33 @@ def listar_pendentes(db: Session = Depends(get_db)):
         ]
     }
 
+@router.get("/historico")
+def historico_nascimentos(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.status.in_(["aprovado", "rejeitado"])
+    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "sexo_bebe": r.sexo_bebe,
+                "nome_completo": r.nome_completo or "— sem nome —",
+                "data_nascimento": str(r.data_nascimento),
+                "nome_pai": r.nome_pai,
+                "nome_mae": r.nome_mae,
+                "data_recepcao": str(r.data_recepcao),
+                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
+                "confirmado_por": r.confirmado_por,
+                "motivo_rejeicao": r.motivo_rejeicao,
+                "rejeitado_por": r.rejeitado_por,
+            }
+            for r in registos
+        ]
+    }    
 
 @router.get("/{pre_registo_id}")
 def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
@@ -322,30 +349,3 @@ def verificar_nuic(nuic: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="NUIC não encontrado.")
     return registo
 
-@router.get("/historico")
-def historico_nascimentos(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoNascimento).filter(
-        PreRegistoNascimento.status.in_(["aprovado", "rejeitado"])
-    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
-
-    return {
-        "total": len(registos),
-        "registos": [
-            {
-                "id": r.id,
-                "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "sexo_bebe": r.sexo_bebe,
-                "nome_completo": r.nome_completo or "— sem nome —",
-                "data_nascimento": str(r.data_nascimento),
-                "nome_pai": r.nome_pai,
-                "nome_mae": r.nome_mae,
-                "data_recepcao": str(r.data_recepcao),
-                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
-                "confirmado_por": r.confirmado_por,
-                "motivo_rejeicao": r.motivo_rejeicao,
-                "rejeitado_por": r.rejeitado_por,
-            }
-            for r in registos
-        ]
-    }    
