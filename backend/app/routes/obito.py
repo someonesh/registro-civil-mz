@@ -36,7 +36,6 @@ def receber_obito_fase1(dados: ObitoFase1, db: Session = Depends(get_db)):
     erros = []
     bi_falecido_valido = False
 
-    # Validar BI do falecido se fornecido
     if dados.bi_falecido:
         resultado = verificar_bi_falecido(db, dados.bi_falecido, dados.nome_completo)
         if not resultado["valido"]:
@@ -135,65 +134,6 @@ def completar_obito_fase2(dados: ObitoFase2, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/pendentes")
-def listar_pendentes(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoObito).filter(
-        PreRegistoObito.status.in_(["incompleto", "aguarda_aprovacao"])
-    ).order_by(PreRegistoObito.data_recepcao.desc()).all()
-
-    return {
-        "total": len(registos),
-        "registos": [
-            {
-                "id": r.id,
-                "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "nome_completo": r.nome_completo,
-                "dia_falecimento": str(r.dia_falecimento),
-                "causa_morte": r.causa_morte,
-                "nome_declarante": r.nome_declarante,
-                "canal_notificacao": r.canal_notificacao,
-                "data_recepcao": str(r.data_recepcao)
-            }
-            for r in registos
-        ]
-    }
-
-@router.get("/historico")
-def historico_obitos(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoObito).filter(
-        PreRegistoObito.status.in_(["aprovado", "rejeitado"])
-    ).order_by(PreRegistoObito.data_recepcao.desc()).all()
-
-    return {
-        "total": len(registos),
-        "registos": [
-            {
-                "id": r.id,
-                "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "nome_completo": r.nome_completo,
-                "dia_falecimento": str(r.dia_falecimento),
-                "causa_morte": r.causa_morte,
-                "nome_declarante": r.nome_declarante,
-                "data_recepcao": str(r.data_recepcao),
-                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
-                "confirmado_por": r.confirmado_por,
-                "motivo_rejeicao": r.motivo_rejeicao,
-                "rejeitado_por": r.rejeitado_por,
-            }
-            for r in registos
-        ]
-    }    
-
-@router.get("/{pre_registo_id}")
-def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
-    r = db.query(PreRegistoObito).filter(PreRegistoObito.id == pre_registo_id).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
-    return r
-
-
 @router.post("/aprovar")
 def aprovar_obito(dados: AprovarObito, db: Session = Depends(get_db)):
     pre_registo = db.query(PreRegistoObito).filter(
@@ -242,7 +182,7 @@ def aprovar_obito(dados: AprovarObito, db: Session = Depends(get_db)):
         testamento=pre_registo.testamento,
         registo_nascimento_ref=dados.registo_nascimento_ref,
         registo_casamento_ref=dados.registo_casamento_ref,
-        conservatoria=config_conservatoria.valor if config_conservatoria else "Conservatória da Beira",
+        conservatoria=config_conservatoria.valor if config_conservatoria else "1ª Conservatória do Registo Civil da Beira",
         conservador=dados.conservador,
         diario_numero=dados.diario_numero,
     )
@@ -254,18 +194,9 @@ def aprovar_obito(dados: AprovarObito, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(registo)
 
-    enviar_notificacao_obito(db, pre_registo, tipo="aprovado", registo=registo)
-
-    return {
-        "sucesso": True,
-        "numero_assento": numero_assento,
-        "mensagem": f"Registo de óbito aprovado. Assento nº {numero_assento}"
-    }
-
-# Gerar PDF
+    # Gerar PDF
     try:
         from app.services.pdf import gerar_assento_obito
-        from app.models.configuracao import Configuracao
         cfg_conserv = db.query(Configuracao).filter(Configuracao.chave == "nome_conservatoria").first()
         cfg_cons = db.query(Configuracao).filter(Configuracao.chave == "nome_conservador").first()
         pdf_path = gerar_assento_obito(
@@ -278,6 +209,15 @@ def aprovar_obito(dados: AprovarObito, db: Session = Depends(get_db)):
         db.commit()
     except Exception as e:
         print(f"[PDF ERRO] {e}")
+
+    enviar_notificacao_obito(db, pre_registo, tipo="aprovado", registo=registo)
+
+    return {
+        "sucesso": True,
+        "numero_assento": numero_assento,
+        "mensagem": f"Registo de óbito aprovado. Assento nº {numero_assento}"
+    }
+
 
 @router.post("/rejeitar")
 def rejeitar_obito(dados: RejeitarObito, db: Session = Depends(get_db)):
@@ -296,3 +236,91 @@ def rejeitar_obito(dados: RejeitarObito, db: Session = Depends(get_db)):
     return {"sucesso": True, "mensagem": f"Óbito rejeitado. Motivo: {dados.motivo_rejeicao}"}
 
 
+# ── ROTAS FIXAS ANTES DE /{id} ──
+
+@router.get("/pendentes")
+def listar_pendentes(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoObito).filter(
+        PreRegistoObito.status.in_(["incompleto", "aguarda_aprovacao"])
+    ).order_by(PreRegistoObito.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "nome_completo": r.nome_completo,
+                "dia_falecimento": str(r.dia_falecimento),
+                "causa_morte": r.causa_morte,
+                "nome_declarante": r.nome_declarante,
+                "canal_notificacao": r.canal_notificacao,
+                "data_recepcao": str(r.data_recepcao)
+            }
+            for r in registos
+        ]
+    }
+
+
+@router.get("/historico")
+def historico_obitos(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoObito).filter(
+        PreRegistoObito.status.in_(["aprovado", "rejeitado"])
+    ).order_by(PreRegistoObito.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "nome_completo": r.nome_completo,
+                "dia_falecimento": str(r.dia_falecimento),
+                "causa_morte": r.causa_morte,
+                "nome_declarante": r.nome_declarante,
+                "data_recepcao": str(r.data_recepcao),
+                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
+                "confirmado_por": r.confirmado_por,
+                "motivo_rejeicao": r.motivo_rejeicao,
+                "rejeitado_por": r.rejeitado_por,
+            }
+            for r in registos
+        ]
+    }
+
+
+@router.get("/registados")
+def listar_registados(db: Session = Depends(get_db)):
+    registos = db.query(RegistoObito).order_by(
+        RegistoObito.data_registo.desc()
+    ).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "numero_assento": r.numero_assento,
+                "nome_completo": r.nome_completo,
+                "sexo": r.sexo,
+                "idade": r.idade,
+                "dia_falecimento": str(r.dia_falecimento),
+                "causa_morte": r.causa_morte,
+                "local_falecimento": r.local_falecimento,
+                "provincia_falecimento": r.provincia_falecimento,
+                "conservador": r.conservador,
+                "data_registo": str(r.data_registo),
+            }
+            for r in registos
+        ]
+    }
+
+
+@router.get("/{pre_registo_id}")
+def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
+    r = db.query(PreRegistoObito).filter(PreRegistoObito.id == pre_registo_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
+    return r

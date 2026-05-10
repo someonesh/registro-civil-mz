@@ -9,7 +9,6 @@ from app.services.validacao_bi import verificar_bi
 from app.services.nuic import gerar_nuic, gerar_numero_assento_nascimento
 from app.services.notificacoes import enviar_notificacao_nascimento
 import datetime
-import json
 
 router = APIRouter(prefix="/nascimento", tags=["Nascimento"])
 
@@ -26,21 +25,14 @@ def autenticar_hospital(api_key: str, db: Session) -> Hospital:
 
 @router.post("/fase1")
 def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_db)):
-    """
-    Recebe dados iniciais do hospital.
-    Valida BIs dos pais e cria pré-registo.
-    """
-    # Autenticar hospital
     hospital = autenticar_hospital(dados.api_key, db)
 
-    # Verificar se ref_hospital já existe
     existente = db.query(PreRegistoNascimento).filter(
         PreRegistoNascimento.ref_hospital == dados.ref_hospital
     ).first()
     if existente:
         raise HTTPException(status_code=409, detail=f"Referência '{dados.ref_hospital}' já existe no sistema.")
 
-    # Validar BIs
     erros = []
     bi_pai_valido = False
     bi_mae_valido = False
@@ -61,7 +53,6 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
         bi_mae_valido = True
         mae_viva = resultado_mae["dados"]["vivo"]
 
-    # Se houver erros de validação — não cria registo
     if erros:
         return {
             "sucesso": False,
@@ -70,14 +61,12 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
             "mensagem": "Pré-registo não criado. Corrija os dados indicados e reenvie."
         }
 
-    # Determinar canal de notificação
     canal = "pendente"
     if dados.whatsapp_encarregado:
         canal = "whatsapp"
     elif dados.email_encarregado:
         canal = "email"
 
-    # Criar pré-registo
     pre_registo = PreRegistoNascimento(
         ref_hospital=dados.ref_hospital,
         hospital_id=hospital.id,
@@ -109,7 +98,6 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
     db.commit()
     db.refresh(pre_registo)
 
-    # Enviar notificação
     enviar_notificacao_nascimento(db, pre_registo, tipo="pre_registo")
 
     return {
@@ -122,10 +110,6 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
 
 @router.post("/fase2")
 def completar_nascimento_fase2(dados: NascimentoFase2, db: Session = Depends(get_db)):
-    """
-    Recebe dados complementares do hospital (nome da criança, avós, declarante).
-    Muda estado para aguarda_aprovacao.
-    """
     autenticar_hospital(dados.api_key, db)
 
     pre_registo = db.query(PreRegistoNascimento).filter(
@@ -141,7 +125,6 @@ def completar_nascimento_fase2(dados: NascimentoFase2, db: Session = Depends(get
             detail=f"Pré-registo já se encontra no estado '{pre_registo.status}'."
         )
 
-    # Actualizar dados
     pre_registo.nome_completo = dados.nome_completo
     pre_registo.apelidos = dados.apelidos
     pre_registo.avo_paterno = dados.avo_paterno
@@ -165,78 +148,8 @@ def completar_nascimento_fase2(dados: NascimentoFase2, db: Session = Depends(get
     }
 
 
-@router.get("/pendentes")
-def listar_pendentes(db: Session = Depends(get_db)):
-    """Lista todos os pré-registos pendentes para o painel do registo civil."""
-    registos = db.query(PreRegistoNascimento).filter(
-        PreRegistoNascimento.status.in_(["incompleto", "aguarda_aprovacao"])
-    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
-
-    return {
-        "total": len(registos),
-        "registos": [
-            {
-                "id": r.id,
-                "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "sexo_bebe": r.sexo_bebe,
-                "nome_completo": r.nome_completo or "— sem nome —",
-                "data_nascimento": str(r.data_nascimento),
-                "nome_pai": r.nome_pai,
-                "nome_mae": r.nome_mae,
-                "canal_notificacao": r.canal_notificacao,
-                "total_notificacoes": r.total_notificacoes,
-                "data_recepcao": str(r.data_recepcao)
-            }
-            for r in registos
-        ]
-    }
-
-@router.get("/historico")
-def historico_nascimentos(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoNascimento).filter(
-        PreRegistoNascimento.status.in_(["aprovado", "rejeitado"])
-    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
-
-    return {
-        "total": len(registos),
-        "registos": [
-            {
-                "id": r.id,
-                "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "sexo_bebe": r.sexo_bebe,
-                "nome_completo": r.nome_completo or "— sem nome —",
-                "data_nascimento": str(r.data_nascimento),
-                "nome_pai": r.nome_pai,
-                "nome_mae": r.nome_mae,
-                "data_recepcao": str(r.data_recepcao),
-                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
-                "confirmado_por": r.confirmado_por,
-                "motivo_rejeicao": r.motivo_rejeicao,
-                "rejeitado_por": r.rejeitado_por,
-            }
-            for r in registos
-        ]
-    }    
-
-@router.get("/{pre_registo_id}")
-def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
-    """Retorna todos os dados de um pré-registo para revisão."""
-    r = db.query(PreRegistoNascimento).filter(
-        PreRegistoNascimento.id == pre_registo_id
-    ).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
-    return r
-
-
 @router.post("/aprovar")
 def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
-    """
-    Funcionário do registo civil aprova o registo.
-    Gera NUIC e cria registo permanente.
-    """
     pre_registo = db.query(PreRegistoNascimento).filter(
         PreRegistoNascimento.id == dados.pre_registo_id,
         PreRegistoNascimento.status == "aguarda_aprovacao"
@@ -248,7 +161,6 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
             detail="Pré-registo não encontrado ou não está em estado 'aguarda_aprovacao'."
         )
 
-    # Buscar configurações
     config_conservatoria = db.query(Configuracao).filter(
         Configuracao.chave == "nome_conservatoria"
     ).first()
@@ -256,11 +168,9 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
         Configuracao.chave == "posto_registo"
     ).first()
 
-    # Gerar NUIC e número de assento
     nuic = gerar_nuic(db)
     numero_assento = gerar_numero_assento_nascimento(db)
 
-    # Criar registo permanente
     registo = RegistoNascimento(
         pre_registo_id=pre_registo.id,
         nuic=nuic,
@@ -291,22 +201,34 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
         bi_declarante=pre_registo.bi_declarante,
         estado_civil_declarante=pre_registo.estado_civil_declarante,
         residencia_declarante=pre_registo.residencia_declarante,
-        conservatoria=config_conservatoria.valor if config_conservatoria else "Conservatória da Beira",
+        conservatoria=config_conservatoria.valor if config_conservatoria else "1ª Conservatória do Registo Civil da Beira",
         posto_registo=config_posto.valor if config_posto else "",
         conservador=dados.conservador,
     )
 
     db.add(registo)
-
-    # Actualizar pré-registo
     pre_registo.status = "aprovado"
     pre_registo.data_confirmacao = datetime.datetime.now()
     pre_registo.confirmado_por = dados.conservador
-
     db.commit()
     db.refresh(registo)
 
-    # Enviar notificação com PDF
+    # Gerar PDF
+    try:
+        from app.services.pdf import gerar_boletim_nascimento
+        cfg_conserv = db.query(Configuracao).filter(Configuracao.chave == "nome_conservatoria").first()
+        cfg_cons = db.query(Configuracao).filter(Configuracao.chave == "nome_conservador").first()
+        pdf_path = gerar_boletim_nascimento(
+            registo,
+            conservatoria=cfg_conserv.valor if cfg_conserv else "1ª Conservatória do Registo Civil da Beira",
+            conservador=cfg_cons.valor if cfg_cons else "Dr. João Carlos Gotoro"
+        )
+        registo.pdf_gerado = True
+        registo.pdf_path = pdf_path
+        db.commit()
+    except Exception as e:
+        print(f"[PDF ERRO] {e}")
+
     enviar_notificacao_nascimento(db, pre_registo, tipo="aprovado", registo=registo)
 
     return {
@@ -319,7 +241,6 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
 
 @router.post("/rejeitar")
 def rejeitar_nascimento(dados: RejeitarNascimento, db: Session = Depends(get_db)):
-    """Funcionário do registo civil rejeita o registo com justificação."""
     pre_registo = db.query(PreRegistoNascimento).filter(
         PreRegistoNascimento.id == dados.pre_registo_id,
         PreRegistoNascimento.status == "aguarda_aprovacao"
@@ -331,12 +252,97 @@ def rejeitar_nascimento(dados: RejeitarNascimento, db: Session = Depends(get_db)
     pre_registo.status = "rejeitado"
     pre_registo.motivo_rejeicao = dados.motivo_rejeicao
     pre_registo.rejeitado_por = dados.rejeitado_por
-
     db.commit()
 
     return {
         "sucesso": True,
         "mensagem": f"Registo rejeitado. Motivo: {dados.motivo_rejeicao}"
+    }
+
+
+# ── ROTAS FIXAS ANTES DE /{id} ──
+
+@router.get("/pendentes")
+def listar_pendentes(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.status.in_(["incompleto", "aguarda_aprovacao"])
+    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "sexo_bebe": r.sexo_bebe,
+                "nome_completo": r.nome_completo or "— sem nome —",
+                "data_nascimento": str(r.data_nascimento),
+                "nome_pai": r.nome_pai,
+                "nome_mae": r.nome_mae,
+                "canal_notificacao": r.canal_notificacao,
+                "total_notificacoes": r.total_notificacoes,
+                "data_recepcao": str(r.data_recepcao)
+            }
+            for r in registos
+        ]
+    }
+
+
+@router.get("/historico")
+def historico_nascimentos(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.status.in_(["aprovado", "rejeitado"])
+    ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "sexo_bebe": r.sexo_bebe,
+                "nome_completo": r.nome_completo or "— sem nome —",
+                "data_nascimento": str(r.data_nascimento),
+                "nome_pai": r.nome_pai,
+                "nome_mae": r.nome_mae,
+                "data_recepcao": str(r.data_recepcao),
+                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
+                "confirmado_por": r.confirmado_por,
+                "motivo_rejeicao": r.motivo_rejeicao,
+                "rejeitado_por": r.rejeitado_por,
+            }
+            for r in registos
+        ]
+    }
+
+
+@router.get("/registados")
+def listar_registados(db: Session = Depends(get_db)):
+    registos = db.query(RegistoNascimento).order_by(
+        RegistoNascimento.data_registo.desc()
+    ).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "nuic": r.nuic,
+                "numero_assento": r.numero_assento,
+                "nome_completo": f"{r.nome_completo} {r.apelidos}".strip(),
+                "sexo": r.sexo,
+                "data_nascimento": str(r.data_nascimento),
+                "local_nascimento": r.local_nascimento,
+                "provincia_nascimento": r.provincia_nascimento,
+                "nome_pai": r.nome_pai,
+                "nome_mae": r.nome_mae,
+                "conservador": r.conservador,
+                "data_registo": str(r.data_registo),
+            }
+            for r in registos
+        ]
     }
 
 
@@ -349,3 +355,12 @@ def verificar_nuic(nuic: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="NUIC não encontrado.")
     return registo
 
+
+@router.get("/{pre_registo_id}")
+def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
+    r = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.id == pre_registo_id
+    ).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
+    return r
