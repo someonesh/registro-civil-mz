@@ -86,7 +86,7 @@ def _campo(c, mg, linha_w, y, label, valor):
 def gerar_boletim_nascimento(
     registo,
     conservatoria="1ª Conservatória do Registo Civil da Beira",
-    conservador="Dr. João Carlos Gotoro"
+    conservador="Dr. Rollins da Conceição Chanesa"
 ):
     path = os.path.join(PDF_DIR, f"boletim_nasc_{registo.nuic.replace('-', '_')}.pdf")
     emblema_path = _get_emblema_path()
@@ -178,7 +178,7 @@ def gerar_boletim_nascimento(
 def gerar_assento_nascimento(
     registo,
     conservatoria="1ª Conservatória do Registo Civil da Beira",
-    conservador="Dr. João Carlos Gotoro"
+    conservador="Dr. Rollins da Conceição Chanesa"
 ):
     path = os.path.join(PDF_DIR, f"assento_nasc_{registo.numero_assento}.pdf")
     emblema_path = _get_emblema_path()
@@ -296,7 +296,7 @@ def gerar_assento_nascimento(
 def gerar_assento_obito(
     registo,
     conservatoria="1ª Conservatória do Registo Civil da Beira",
-    conservador="Dr. João Carlos Gotoro"
+    conservador="Dr. Rollins da Conceição Chanesa"
 ):
     path = os.path.join(PDF_DIR, f"assento_obito_{registo.numero_assento}.pdf")
     emblema_path = _get_emblema_path()

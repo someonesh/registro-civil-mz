@@ -7,6 +7,8 @@ import DetalheNascimento from './pages/DetalheNascimento'
 import DetalheObito from './pages/DetalheObito'
 import Verificar from './pages/Verificar'
 import Configuracoes from './pages/Configuracoes'
+import HistoricoNascimento from './pages/HistoricoNascimento'
+import HistoricoObito from './pages/HistoricoObito'
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="obitos/:id" element={<DetalheObito />} />
         <Route path="verificar" element={<Verificar />} />
         <Route path="configuracoes" element={<Configuracoes />} />
+        <Route path="nascimentos/historico" element={<HistoricoNascimento />} />
+        <Route path="obitos/historico" element={<HistoricoObito />} />
       </Route>
     </Routes>
   )

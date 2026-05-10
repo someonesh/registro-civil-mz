@@ -268,3 +268,31 @@ def rejeitar_obito(dados: RejeitarObito, db: Session = Depends(get_db)):
     db.commit()
 
     return {"sucesso": True, "mensagem": f"Óbito rejeitado. Motivo: {dados.motivo_rejeicao}"}
+
+
+@router.get("/historico")
+def historico_obitos(db: Session = Depends(get_db)):
+    registos = db.query(PreRegistoObito).filter(
+        PreRegistoObito.status.in_(["aprovado", "rejeitado"])
+    ).order_by(PreRegistoObito.data_recepcao.desc()).all()
+
+    return {
+        "total": len(registos),
+        "registos": [
+            {
+                "id": r.id,
+                "ref_hospital": r.ref_hospital,
+                "status": r.status,
+                "nome_completo": r.nome_completo,
+                "dia_falecimento": str(r.dia_falecimento),
+                "causa_morte": r.causa_morte,
+                "nome_declarante": r.nome_declarante,
+                "data_recepcao": str(r.data_recepcao),
+                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
+                "confirmado_por": r.confirmado_por,
+                "motivo_rejeicao": r.motivo_rejeicao,
+                "rejeitado_por": r.rejeitado_por,
+            }
+            for r in registos
+        ]
+    }    

@@ -6,6 +6,7 @@ from app.routes import nascimento, obito, configuracoes
 from app.database import SessionLocal, engine
 from app.models import nascimento as m_nasc, obito as m_obito
 import datetime
+from app.routes import nascimento, obito, configuracoes, auth
 
 def reenviar_notificacoes():
     """
@@ -88,6 +89,7 @@ app.add_middleware(
 app.include_router(nascimento.router)
 app.include_router(obito.router)
 app.include_router(configuracoes.router)
+app.include_router(auth.router)
 
 @app.get("/")
 def root():
