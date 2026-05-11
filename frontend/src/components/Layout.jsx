@@ -58,6 +58,18 @@ export default function Layout() {
               <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
               Registos de Óbito
             </NavLink>
+            <NavLink to="/nascimentos/historico" className={link}>
+              <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
+              Histórico Nascimentos
+            </NavLink>
+            <NavLink to="/obitos/historico" className={link}>
+              <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
+              Histórico Óbitos
+            </NavLink>
+            <NavLink to="/registados" className={link}>
+              <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
+              Todos os Registos
+            </NavLink>
             <NavLink to="/verificar" className={link}>
               <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
               Verificar Registo
@@ -66,14 +78,6 @@ export default function Layout() {
               <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
               Configurações
             </NavLink>
-            <NavLink to="/nascimentos/historico" className={link}>
-  <span className="w-1 h-3 rounded-full bg-current opacity-50 flex-shrink-0"></span>
-  Histórico Nascimentos
-</NavLink>
-<NavLink to="/obitos/historico" className={link}>
-  <span className="w-1 h-3 rounded-full bg-current opacity-50 flex-shrink-0"></span>
-  Histórico Óbitos
-</NavLink>
           </nav>
           <div className="border-t border-[#E2E8F0] px-4 py-4 bg-[#F7FAFC]">
             <p className="text-[10px] text-[#718096] leading-relaxed">

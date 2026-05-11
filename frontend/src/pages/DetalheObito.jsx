@@ -14,12 +14,29 @@ export default function DetalheObito() {
     api.get(`/obito/${id}`).then(r => setRegisto(r.data)).catch(()=>{})
   }, [id])
 
+  const notificarHospital = async (estado, detalhes) => {
+    try {
+      await api.post('/notificacao/hospital', {
+        ref_hospital: registo.ref_hospital,
+        tipo: 'obito',
+        estado,
+        detalhes
+      })
+    } catch (_) {
+      // notificação é best-effort; não bloquear o fluxo
+    }
+  }
+
   const aprovar = () => {
     api.post('/obito/aprovar', {
       pre_registo_id: parseInt(id), conservador,
       diario_numero: `DIA-OB-${new Date().getFullYear()}-${id}`
-    }).then(r => {
-      setMensagem({ tipo: 'sucesso', texto: r.data.mensagem })
+    }).then(async r => {
+      await notificarHospital('aprovado', {
+        mensagem: `O registo de óbito de ${registo.nome_completo} foi aprovado pelo conservador ${conservador}.`,
+        diario_numero: `DIA-OB-${new Date().getFullYear()}-${id}`
+      })
+      setMensagem({ tipo: 'sucesso', texto: r.data.mensagem + ' — Hospital notificado.' })
       setTimeout(() => navigate('/obitos'), 2000)
     }).catch(e => setMensagem({ tipo: 'erro', texto: e.response?.data?.detail || 'Erro ao aprovar.' }))
   }
@@ -28,8 +45,12 @@ export default function DetalheObito() {
     if (!motivo) return alert('Escreve o motivo de rejeição.')
     api.post('/obito/rejeitar', {
       pre_registo_id: parseInt(id), motivo_rejeicao: motivo, rejeitado_por: conservador
-    }).then(r => {
-      setMensagem({ tipo: 'aviso', texto: r.data.mensagem })
+    }).then(async r => {
+      await notificarHospital('rejeitado', {
+        mensagem: `O registo de óbito de ${registo.nome_completo} foi rejeitado.`,
+        motivo_rejeicao: motivo
+      })
+      setMensagem({ tipo: 'aviso', texto: r.data.mensagem + ' — Hospital notificado.' })
       setTimeout(() => navigate('/obitos'), 2000)
     })
   }
@@ -57,10 +78,16 @@ export default function DetalheObito() {
       <div className="flex items-center gap-4 mb-6 pb-4 border-b-2 border-[#009A44]">
         <button onClick={() => navigate('/obitos')} className="text-xs text-[#009A44] hover:underline font-medium">Voltar</button>
         <div className="w-px h-4 bg-[#E2E8F0]"></div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold text-[#003F20]">Processo de Registo de Óbito</h2>
           <p className="text-xs text-[#718096] mt-0.5" style={{fontFamily:'monospace'}}>Ref: {registo.ref_hospital}</p>
         </div>
+        {{
+          aguarda_aprovacao: <span className="px-3 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">⏳ Aguarda Aprovação</span>,
+          aprovado: <span className="px-3 py-1 rounded-full text-xs font-bold border bg-green-50 text-green-700 border-green-200">✓ Aprovado</span>,
+          rejeitado: <span className="px-3 py-1 rounded-full text-xs font-bold border bg-red-50 text-red-700 border-red-200">✗ Rejeitado</span>,
+          incompleto: <span className="px-3 py-1 rounded-full text-xs font-bold border bg-gray-50 text-gray-500 border-gray-200">Incompleto</span>,
+        }[registo.status]}
       </div>
 
       {mensagem && (
