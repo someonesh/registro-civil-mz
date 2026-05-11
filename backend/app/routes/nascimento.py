@@ -291,29 +291,47 @@ def listar_pendentes(db: Session = Depends(get_db)):
 
 @router.get("/historico")
 def historico_nascimentos(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoNascimento).filter(
-        PreRegistoNascimento.status.in_(["aprovado", "rejeitado"])
+    # Aprovados — vêm da tabela registos_nascimento
+    aprovados = db.query(RegistoNascimento).order_by(
+        RegistoNascimento.data_registo.desc()
+    ).all()
+
+    # Rejeitados — vêm da tabela pre_registos_nascimento
+    rejeitados = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.status == "rejeitado"
     ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()
 
     return {
-        "total": len(registos),
-        "registos": [
+        "aprovados": [
+            {
+                "id": r.id,
+                "nuic": r.nuic,
+                "numero_assento": r.numero_assento,
+                "nome_completo": f"{r.nome_completo} {r.apelidos}".strip(),
+                "sexo": r.sexo,
+                "data_nascimento": str(r.data_nascimento),
+                "local_nascimento": r.local_nascimento,
+                "provincia_nascimento": r.provincia_nascimento,
+                "nome_pai": r.nome_pai,
+                "nome_mae": r.nome_mae,
+                "conservador": r.conservador,
+                "data_registo": str(r.data_registo),
+            }
+            for r in aprovados
+        ],
+        "rejeitados": [
             {
                 "id": r.id,
                 "ref_hospital": r.ref_hospital,
-                "status": r.status,
-                "sexo_bebe": r.sexo_bebe,
                 "nome_completo": r.nome_completo or "— sem nome —",
                 "data_nascimento": str(r.data_nascimento),
                 "nome_pai": r.nome_pai,
                 "nome_mae": r.nome_mae,
-                "data_recepcao": str(r.data_recepcao),
-                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
-                "confirmado_por": r.confirmado_por,
                 "motivo_rejeicao": r.motivo_rejeicao,
                 "rejeitado_por": r.rejeitado_por,
+                "data_recepcao": str(r.data_recepcao),
             }
-            for r in registos
+            for r in rejeitados
         ]
     }
 

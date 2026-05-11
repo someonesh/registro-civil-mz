@@ -265,31 +265,46 @@ def listar_pendentes(db: Session = Depends(get_db)):
 
 @router.get("/historico")
 def historico_obitos(db: Session = Depends(get_db)):
-    registos = db.query(PreRegistoObito).filter(
-        PreRegistoObito.status.in_(["aprovado", "rejeitado"])
+    aprovados = db.query(RegistoObito).order_by(
+        RegistoObito.data_registo.desc()
+    ).all()
+
+    rejeitados = db.query(PreRegistoObito).filter(
+        PreRegistoObito.status == "rejeitado"
     ).order_by(PreRegistoObito.data_recepcao.desc()).all()
 
     return {
-        "total": len(registos),
-        "registos": [
+        "aprovados": [
+            {
+                "id": r.id,
+                "numero_assento": r.numero_assento,
+                "nome_completo": r.nome_completo,
+                "sexo": r.sexo,
+                "idade": r.idade,
+                "dia_falecimento": str(r.dia_falecimento),
+                "causa_morte": r.causa_morte,
+                "local_falecimento": r.local_falecimento,
+                "provincia_falecimento": r.provincia_falecimento,
+                "nome_declarante": r.nome_declarante,
+                "conservador": r.conservador,
+                "data_registo": str(r.data_registo),
+            }
+            for r in aprovados
+        ],
+        "rejeitados": [
             {
                 "id": r.id,
                 "ref_hospital": r.ref_hospital,
-                "status": r.status,
                 "nome_completo": r.nome_completo,
                 "dia_falecimento": str(r.dia_falecimento),
                 "causa_morte": r.causa_morte,
-                "nome_declarante": r.nome_declarante,
-                "data_recepcao": str(r.data_recepcao),
-                "data_confirmacao": str(r.data_confirmacao) if r.data_confirmacao else None,
-                "confirmado_por": r.confirmado_por,
                 "motivo_rejeicao": r.motivo_rejeicao,
                 "rejeitado_por": r.rejeitado_por,
+                "data_recepcao": str(r.data_recepcao),
             }
-            for r in registos
+            for r in rejeitados
         ]
     }
-
 
 @router.get("/registados")
 def listar_registados(db: Session = Depends(get_db)):
