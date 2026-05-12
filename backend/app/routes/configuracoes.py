@@ -7,12 +7,15 @@ from app.models.cidadao import CidadaoBI
 
 router = APIRouter(prefix="/configuracoes", tags=["Configurações"])
 
+
 class ValorUpdate(BaseModel):
     valor: str
+
 
 @router.get("/")
 def listar(db: Session = Depends(get_db)):
     return db.query(Configuracao).all()
+
 
 @router.put("/{chave}")
 def actualizar(chave: str, dados: ValorUpdate, db: Session = Depends(get_db)):
@@ -23,7 +26,8 @@ def actualizar(chave: str, dados: ValorUpdate, db: Session = Depends(get_db)):
     db.commit()
     return {"sucesso": True, "chave": chave, "valor": dados.valor}
 
-    @router.get("/cidadaos")
+
+@router.get("/cidadaos")
 def listar_cidadaos(db: Session = Depends(get_db)):
     cidadaos = db.query(CidadaoBI).order_by(CidadaoBI.nome_completo).all()
     return {
