@@ -2,17 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.routes import nascimento, obito, configuracoes
-from app.database import SessionLocal, engine
-from app.models import nascimento as m_nasc, obito as m_obito
-import datetime
 from app.routes import nascimento, obito, configuracoes, auth
+from app.database import SessionLocal
+import datetime
+
 
 def reenviar_notificacoes():
-    """
-    Corre em background. Verifica registos pendentes e reenvia
-    notificações conforme a frequência configurada na BD.
-    """
     db = SessionLocal()
     try:
         from app.models.configuracao import Configuracao
@@ -20,7 +15,6 @@ def reenviar_notificacoes():
         from app.models.obito import PreRegistoObito
         from app.services.notificacoes import enviar_notificacao_nascimento, enviar_notificacao_obito
 
-        # Ler frequência configurada (em minutos)
         config = db.query(Configuracao).filter(
             Configuracao.chave == "frequencia_notificacao_minutos"
         ).first()
@@ -29,7 +23,6 @@ def reenviar_notificacoes():
         agora = datetime.datetime.now()
         limite = agora - datetime.timedelta(minutes=frequencia_min)
 
-        # Nascimentos pendentes sem notificação recente
         pendentes_nasc = db.query(PreRegistoNascimento).filter(
             PreRegistoNascimento.status.in_(["incompleto", "aguarda_aprovacao"]),
             (PreRegistoNascimento.ultima_notificacao == None) |
@@ -37,10 +30,8 @@ def reenviar_notificacoes():
         ).all()
 
         for r in pendentes_nasc:
-            print(f"[SCHEDULER] Reenviar nascimento ID {r.id}")
             enviar_notificacao_nascimento(db, r, tipo="pre_registo")
 
-        # Óbitos pendentes sem notificação recente
         pendentes_ob = db.query(PreRegistoObito).filter(
             PreRegistoObito.status.in_(["incompleto", "aguarda_aprovacao"]),
             (PreRegistoObito.ultima_notificacao == None) |
@@ -48,7 +39,6 @@ def reenviar_notificacoes():
         ).all()
 
         for r in pendentes_ob:
-            print(f"[SCHEDULER] Reenviar óbito ID {r.id}")
             enviar_notificacao_obito(db, r, tipo="pre_registo")
 
         print(f"[SCHEDULER] {agora.strftime('%H:%M:%S')} — {len(pendentes_nasc)} nasc. + {len(pendentes_ob)} óbitos processados")
@@ -66,7 +56,7 @@ scheduler.add_job(reenviar_notificacoes, 'interval', minutes=1)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    print("[SCHEDULER] Iniciado — a verificar notificações a cada minuto")
+    print("[SCHEDULER] Iniciado")
     yield
     scheduler.shutdown()
     print("[SCHEDULER] Encerrado")
@@ -91,9 +81,11 @@ app.include_router(obito.router)
 app.include_router(configuracoes.router)
 app.include_router(auth.router)
 
+
 @app.get("/")
 def root():
     return {"mensagem": "Sistema de Registo Civil — Moçambique", "status": "activo"}
+
 
 @app.get("/health")
 def health():
