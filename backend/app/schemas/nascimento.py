@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import date
 
+
 class NascimentoFase1(BaseModel):
     """Dados enviados pelo hospital na fase inicial"""
     ref_hospital: str
@@ -15,9 +16,9 @@ class NascimentoFase1(BaseModel):
     provincia_nascimento: str
     distrito_nascimento: Optional[str] = None
 
-    # Pai
-    bi_pai: str
-    nome_pai: str
+    # Pai — OPCIONAIS: mãe solteira sem pai presente = paternidade não fixada
+    bi_pai: Optional[str] = None
+    nome_pai: Optional[str] = None
     naturalidade_pai: Optional[str] = None
     estado_civil_pai: Optional[str] = None
 
@@ -53,6 +54,15 @@ class NascimentoFase2(BaseModel):
     estado_civil_declarante: Optional[str] = None
     residencia_declarante: Optional[str] = None
     relacao_declarante: Optional[str] = "outro"
+
+
+class ReconhecerPaternidade(BaseModel):
+    """Usado para reconhecimento posterior de paternidade"""
+    api_key: str
+    bi_pai: str
+    nome_pai: str
+    estado_civil_pai: Optional[str] = None
+    naturalidade_pai: Optional[str] = None
 
 
 class AprovarNascimento(BaseModel):

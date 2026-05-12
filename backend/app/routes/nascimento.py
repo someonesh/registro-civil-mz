@@ -4,7 +4,7 @@ from app.database import get_db
 from app.models.hospital import Hospital
 from app.models.nascimento import PreRegistoNascimento, RegistoNascimento
 from app.models.configuracao import Configuracao
-from app.schemas.nascimento import NascimentoFase1, NascimentoFase2, AprovarNascimento, RejeitarNascimento
+from app.schemas.nascimento import NascimentoFase1, NascimentoFase2, AprovarNascimento, RejeitarNascimento, ReconhecerPaternidade
 from app.services.validacao_bi import verificar_bi
 from app.services.nuic import gerar_nuic, gerar_numero_assento_nascimento
 from app.services.notificacoes import enviar_notificacao_nascimento
@@ -39,13 +39,18 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
     pai_vivo = True
     mae_viva = True
 
-    resultado_pai = verificar_bi(db, dados.bi_pai, dados.nome_pai)
-    if not resultado_pai["valido"]:
-        erros.append({"campo": "bi_pai", "mensagem": resultado_pai["mensagem"]})
-    else:
-        bi_pai_valido = True
-        pai_vivo = resultado_pai["dados"]["vivo"]
+    # Paternidade: só validar se bi_pai foi enviado
+    paternidade_fixada = bool(dados.bi_pai and dados.nome_pai)
 
+    if paternidade_fixada:
+        resultado_pai = verificar_bi(db, dados.bi_pai, dados.nome_pai)
+        if not resultado_pai["valido"]:
+            erros.append({"campo": "bi_pai", "mensagem": resultado_pai["mensagem"]})
+        else:
+            bi_pai_valido = True
+            pai_vivo = resultado_pai["dados"]["vivo"]
+
+    # Mãe é sempre obrigatória
     resultado_mae = verificar_bi(db, dados.bi_mae, dados.nome_mae)
     if not resultado_mae["valido"]:
         erros.append({"campo": "bi_mae", "mensagem": resultado_mae["mensagem"]})
@@ -77,7 +82,7 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
         local_nascimento=dados.local_nascimento,
         provincia_nascimento=dados.provincia_nascimento,
         distrito_nascimento=dados.distrito_nascimento,
-        bi_pai=dados.bi_pai.upper(),
+        bi_pai=dados.bi_pai.upper() if dados.bi_pai else None,
         nome_pai=dados.nome_pai,
         naturalidade_pai=dados.naturalidade_pai,
         estado_civil_pai=dados.estado_civil_pai,
@@ -89,6 +94,7 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
         mae_viva=mae_viva,
         bi_pai_valido=bi_pai_valido,
         bi_mae_valido=bi_mae_valido,
+        paternidade_fixada=paternidade_fixada,
         whatsapp_encarregado=dados.whatsapp_encarregado,
         email_encarregado=dados.email_encarregado,
         canal_notificacao=canal
@@ -100,11 +106,13 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
 
     enviar_notificacao_nascimento(db, pre_registo, tipo="pre_registo")
 
+    msg_pat = "" if paternidade_fixada else " Paternidade não fixada — mãe declarou sem presença do pai."
     return {
         "sucesso": True,
         "status": "incompleto",
         "pre_registo_id": pre_registo.id,
-        "mensagem": "Pré-registo criado com sucesso. Aguarda dados complementares (fase 2)."
+        "paternidade_fixada": paternidade_fixada,
+        "mensagem": f"Pré-registo criado com sucesso. Aguarda dados complementares (fase 2).{msg_pat}"
     }
 
 
@@ -161,15 +169,16 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
             detail="Pré-registo não encontrado ou não está em estado 'aguarda_aprovacao'."
         )
 
-    config_conservatoria = db.query(Configuracao).filter(
-        Configuracao.chave == "nome_conservatoria"
-    ).first()
-    config_posto = db.query(Configuracao).filter(
-        Configuracao.chave == "posto_registo"
-    ).first()
+    config_conservatoria = db.query(Configuracao).filter(Configuracao.chave == "nome_conservatoria").first()
+    config_posto = db.query(Configuracao).filter(Configuracao.chave == "posto_registo").first()
 
     nuic = gerar_nuic(db)
     numero_assento = gerar_numero_assento_nascimento(db)
+
+    # Nome do pai: se paternidade não fixada, indicar explicitamente
+    nome_pai_registo = pre_registo.nome_pai
+    if not pre_registo.paternidade_fixada:
+        nome_pai_registo = "Não declarado — paternidade não fixada"
 
     registo = RegistoNascimento(
         pre_registo_id=pre_registo.id,
@@ -185,7 +194,7 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
         local_nascimento=pre_registo.local_nascimento,
         provincia_nascimento=pre_registo.provincia_nascimento,
         distrito_nascimento=pre_registo.distrito_nascimento,
-        nome_pai=pre_registo.nome_pai,
+        nome_pai=nome_pai_registo,
         bi_pai=pre_registo.bi_pai,
         naturalidade_pai=pre_registo.naturalidade_pai,
         estado_civil_pai=pre_registo.estado_civil_pai,
@@ -213,7 +222,6 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(registo)
 
-    # Gerar PDF
     try:
         from app.services.pdf import gerar_boletim_nascimento
         cfg_conserv = db.query(Configuracao).filter(Configuracao.chave == "nome_conservatoria").first()
@@ -260,7 +268,58 @@ def rejeitar_nascimento(dados: RejeitarNascimento, db: Session = Depends(get_db)
     }
 
 
-# ── ROTAS FIXAS ANTES DE /{id} ──
+@router.post("/{pre_registo_id}/reconhecer-paternidade")
+def reconhecer_paternidade(pre_registo_id: int, dados: ReconhecerPaternidade, db: Session = Depends(get_db)):
+    """
+    Permite ao hospital registar o reconhecimento posterior de paternidade.
+    Usado quando o pai se apresenta depois do nascimento para reconhecer a criança.
+    Só aplicável a registos com paternidade_fixada = False.
+    """
+    autenticar_hospital(dados.api_key, db)
+
+    pre_registo = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.id == pre_registo_id
+    ).first()
+
+    if not pre_registo:
+        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
+
+    if pre_registo.paternidade_fixada:
+        raise HTTPException(status_code=400, detail="Este registo já tem paternidade fixada.")
+
+    # Validar o BI do pai
+    resultado_pai = verificar_bi(db, dados.bi_pai, dados.nome_pai)
+    if not resultado_pai["valido"]:
+        raise HTTPException(status_code=422, detail=resultado_pai["mensagem"])
+
+    # Actualizar o pré-registo
+    pre_registo.bi_pai = dados.bi_pai.upper()
+    pre_registo.nome_pai = dados.nome_pai
+    pre_registo.estado_civil_pai = dados.estado_civil_pai
+    pre_registo.naturalidade_pai = dados.naturalidade_pai
+    pre_registo.bi_pai_valido = True
+    pre_registo.paternidade_fixada = True
+    pre_registo.pai_vivo = resultado_pai["dados"]["vivo"]
+
+    # Se já existe um registo aprovado, actualizar também
+    registo = db.query(RegistoNascimento).filter(
+        RegistoNascimento.pre_registo_id == pre_registo_id
+    ).first()
+    if registo:
+        registo.bi_pai = dados.bi_pai.upper()
+        registo.nome_pai = dados.nome_pai
+        registo.estado_civil_pai = dados.estado_civil_pai
+        registo.naturalidade_pai = dados.naturalidade_pai
+
+    db.commit()
+
+    return {
+        "sucesso": True,
+        "mensagem": f"Paternidade reconhecida com sucesso. Pai: {dados.nome_pai} ({dados.bi_pai.upper()})"
+    }
+
+
+# ── ROTAS DE CONSULTA — fixas antes de /{id} ──
 
 @router.get("/pendentes")
 def listar_pendentes(db: Session = Depends(get_db)):
@@ -280,6 +339,7 @@ def listar_pendentes(db: Session = Depends(get_db)):
                 "data_nascimento": str(r.data_nascimento),
                 "nome_pai": r.nome_pai,
                 "nome_mae": r.nome_mae,
+                "paternidade_fixada": r.paternidade_fixada,
                 "canal_notificacao": r.canal_notificacao,
                 "total_notificacoes": r.total_notificacoes,
                 "data_recepcao": str(r.data_recepcao)
@@ -291,12 +351,10 @@ def listar_pendentes(db: Session = Depends(get_db)):
 
 @router.get("/historico")
 def historico_nascimentos(db: Session = Depends(get_db)):
-    # Aprovados — vêm da tabela registos_nascimento
     aprovados = db.query(RegistoNascimento).order_by(
         RegistoNascimento.data_registo.desc()
     ).all()
 
-    # Rejeitados — vêm da tabela pre_registos_nascimento
     rejeitados = db.query(PreRegistoNascimento).filter(
         PreRegistoNascimento.status == "rejeitado"
     ).order_by(PreRegistoNascimento.data_recepcao.desc()).all()

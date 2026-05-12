@@ -78,6 +78,10 @@ export default function Layout() {
               <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
               Configurações
             </NavLink>
+            <NavLink to="/base-dados" className={link}>
+            <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
+            Base de Dados BI
+           </NavLink>
           </nav>
           <div className="border-t border-[#E2E8F0] px-4 py-4 bg-[#F7FAFC]">
             <p className="text-[10px] text-[#718096] leading-relaxed">

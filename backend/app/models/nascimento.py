@@ -39,6 +39,7 @@ class PreRegistoNascimento(Base):
     relacao_declarante      = Column(String(20), default="outro")
     bi_pai_valido           = Column(Boolean, default=False)
     bi_mae_valido           = Column(Boolean, default=False)
+    paternidade_fixada      = Column(Boolean, default=True)
     erros_validacao         = Column(Text)
     motivo_rejeicao         = Column(Text)
     rejeitado_por           = Column(String(200))
