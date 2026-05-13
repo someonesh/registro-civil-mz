@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
+import ModalEditarRegisto from '../components/ModalEditarRegisto'
 
 export default function HistoricoObito() {
   const [aprovados, setAprovados] = useState([])
@@ -7,8 +8,11 @@ export default function HistoricoObito() {
   const [tab, setTab] = useState('aprovados')
   const [erro, setErro] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [modalAberto, setModalAberto] = useState(false)
+  const [registoSelecionado, setRegistoSelecionado] = useState(null)
 
-  useEffect(() => {
+  const carregarDados = () => {
+    setLoading(true)
     api.get('/obito/historico')
       .then(r => {
         setAprovados(r.data.aprovados || [])
@@ -16,7 +20,15 @@ export default function HistoricoObito() {
       })
       .catch(e => setErro(`Erro: ${e.response?.data?.detail || e.message}`))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    carregarDados()
   }, [])
+
+  const refreshData = () => {
+    carregarDados()
+  }
 
   return (
     <div className="p-8" style={{ fontFamily: "'Georgia', serif" }}>
@@ -53,7 +65,14 @@ export default function HistoricoObito() {
                 <p className="col-span-2 text-xs font-bold text-[#4A5568] uppercase tracking-wide">Conservador</p>
               </div>
               {aprovados.map(r => (
-                <div key={r.id} className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] transition-colors items-center">
+                <div 
+                  key={r.id} 
+                  className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] cursor-pointer transition-colors items-center"
+                  onClick={() => {
+                    setRegistoSelecionado(r)
+                    setModalAberto(true)
+                  }}
+                >
                   <p className="col-span-1 text-xs font-mono text-[#A0AEC0]">{r.numero_assento}</p>
                   <p className="col-span-3 text-sm font-semibold text-[#2D3748]">{r.nome_completo}</p>
                   <p className="col-span-1 text-xs text-[#718096]">{r.sexo === 'M' ? 'Masc.' : 'Fem.'}</p>
@@ -93,6 +112,17 @@ export default function HistoricoObito() {
           )}
         </>
       )}
+
+      <ModalEditarRegisto
+        isOpen={modalAberto}
+        onClose={() => {
+          setModalAberto(false)
+          setRegistoSelecionado(null)
+        }}
+        tipo="obito"
+        registo={registoSelecionado}
+        onSave={refreshData}
+      />
     </div>
   )
 }

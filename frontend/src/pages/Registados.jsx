@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import ModalEditarRegisto from '../components/ModalEditarRegisto'
 
 export default function Registados() {
   const [nascimentos, setNascimentos] = useState([])
@@ -11,8 +12,15 @@ export default function Registados() {
   const [erroObit, setErroObit] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const [modalAberto, setModalAberto] = useState(false)
+  const [registoSelecionado, setRegistoSelecionado] = useState(null)
+  const [tipoRegisto, setTipoRegisto] = useState('nascimento')
 
   useEffect(() => {
+    carregarDados()
+  }, [])
+
+  const carregarDados = () => {
     setLoading(true)
     const p1 = api.get('/nascimento/registados')
       .then(r => setNascimentos(r.data.registos || []))
@@ -27,7 +35,11 @@ export default function Registados() {
         setErroObit(`Erro ${e.response?.status || ''}: ${Array.isArray(d) ? d.map(x => x.msg).join(', ') : d || e.message}`)
       })
     Promise.all([p1, p2]).finally(() => setLoading(false))
-  }, [])
+  }
+
+  const refreshData = () => {
+    carregarDados()
+  }
 
   const nascimentosFiltrados = nascimentos.filter(r =>
     pesquisa === '' ||
@@ -73,7 +85,11 @@ export default function Registados() {
             <p className="col-span-2 text-xs font-bold text-[#4A5568] uppercase tracking-wide">Mãe</p>
           </div>
           {nascimentosFiltrados.map(r => (
-            <div key={r.id} className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] cursor-pointer transition-colors items-center" onClick={() => navigate(`/nascimentos/${r.id}`)}>
+            <div key={r.id} className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] cursor-pointer transition-colors items-center" onClick={() => {
+              setRegistoSelecionado(r)
+              setTipoRegisto('nascimento')
+              setModalAberto(true)
+            }}>
               <p className="col-span-2 text-xs font-mono text-[#009A44] font-semibold">{r.nuic || '—'}</p>
               <div className="col-span-3"><p className="text-sm font-semibold text-[#2D3748]">{r.nome_completo}</p><p className="text-xs text-[#A0AEC0]">Assento nº {r.numero_assento || '—'}</p></div>
               <p className="col-span-1 text-xs text-[#718096]">{r.sexo === 'M' ? 'Masc.' : r.sexo === 'F' ? 'Fem.' : '—'}</p>
@@ -97,7 +113,11 @@ export default function Registados() {
             <p className="col-span-1 text-xs font-bold text-[#4A5568] uppercase tracking-wide">Conservador</p>
           </div>
           {obitosFiltrados.map(r => (
-            <div key={r.id} className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] cursor-pointer transition-colors items-center" onClick={() => navigate(`/obitos/${r.id}`)}>
+            <div key={r.id} className="grid grid-cols-12 px-5 py-4 hover:bg-[#F7FAFC] cursor-pointer transition-colors items-center" onClick={() => {
+              setRegistoSelecionado(r)
+              setTipoRegisto('obito')
+              setModalAberto(true)
+            }}>
               <p className="col-span-1 text-xs font-mono text-[#A0AEC0]">{r.numero_assento || '—'}</p>
               <p className="col-span-3 text-sm font-semibold text-[#2D3748]">{r.nome_completo}</p>
               <p className="col-span-1 text-xs text-[#718096]">{r.sexo === 'M' ? 'Masc.' : r.sexo === 'F' ? 'Fem.' : '—'}</p>
@@ -110,6 +130,17 @@ export default function Registados() {
           {!loading && obitosFiltrados.length === 0 && <p className="px-5 py-8 text-sm text-[#A0AEC0] text-center">Nenhum registo encontrado</p>}
         </div>
       )}
+
+      <ModalEditarRegisto
+        isOpen={modalAberto}
+        onClose={() => {
+          setModalAberto(false)
+          setRegistoSelecionado(null)
+        }}
+        tipo={tipoRegisto}
+        registo={registoSelecionado}
+        onSave={refreshData}
+      />
     </div>
   )
 }

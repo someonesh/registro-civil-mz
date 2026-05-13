@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from datetime import date
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.hospital import Hospital
@@ -23,6 +24,43 @@ def autenticar_hospital(api_key: str, db: Session) -> Hospital:
     if not hospital:
         raise HTTPException(status_code=401, detail="API key inválida ou hospital inactivo.")
     return hospital
+
+
+# ── NOVO ENDPOINT PARA EDITAR REGISTO (COLOCAR ANTES DOS ENDPOINTS COM /{id}) ──
+class AtualizarRegistoNascimento(BaseModel):
+    nome_completo: Optional[str] = None
+    apelidos: Optional[str] = None
+    sexo: Optional[str] = None
+    data_nascimento: Optional[date] = None
+    hora_nascimento: Optional[str] = None
+    local_nascimento: Optional[str] = None
+    provincia_nascimento: Optional[str] = None
+    nome_pai: Optional[str] = None
+    nome_mae: Optional[str] = None
+
+
+@router.put("/registados/{registo_id}")
+def atualizar_registo_nascimento(
+    registo_id: int, 
+    dados: AtualizarRegistoNascimento, 
+    db: Session = Depends(get_db)
+):
+    registo = db.query(RegistoNascimento).filter(
+        RegistoNascimento.id == registo_id
+    ).first()
+    
+    if not registo:
+        raise HTTPException(status_code=404, detail="Registo não encontrado.")
+    
+    # Atualizar apenas os campos fornecidos
+    update_data = dados.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(registo, key, value)
+    
+    db.commit()
+    db.refresh(registo)
+    
+    return {"sucesso": True, "mensagem": "Registo actualizado com sucesso.", "registo": registo}
 
 
 @router.post("/fase1")
