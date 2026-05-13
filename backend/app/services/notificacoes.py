@@ -3,7 +3,7 @@ from app.models.notificacoes import NotificacaoLog
 import os
 
 TWILIO_ACTIVO = bool(os.getenv("TWILIO_ACCOUNT_SID", "").startswith("AC"))
-GMAIL_ACTIVO = bool(os.getenv("GMAIL_USER", "").endswith("@gmail.com"))
+GMAIL_ACTIVO = bool(os.getenv("GMAIL_USER", "")) and bool(os.getenv("GMAIL_PASSWORD", ""))
 
 
 def _registar_log(db, tipo, pre_registo_id, canal, destinatario, mensagem, status="enviado", erro=None):

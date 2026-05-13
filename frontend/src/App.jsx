@@ -11,6 +11,7 @@ import HistoricoNascimento from './pages/HistoricoNascimento'
 import HistoricoObito from './pages/HistoricoObito'
 import Registados from './pages/Registados'
 import BaseDados from './pages/BaseDados'
+import ConfirmacaoPresencial from './pages/ConfirmacaoPresencial'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="configuracoes" element={<Configuracoes />} />
         <Route path="registados" element={<Registados />} />
         <Route path="base-dados" element={<BaseDados />} />
+        <Route path="presencial" element={<ConfirmacaoPresencial />} />
       </Route>
     </Routes>
   )

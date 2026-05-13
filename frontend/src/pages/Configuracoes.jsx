@@ -19,8 +19,8 @@ export default function Configuracoes() {
   }
 
   const presets = [
-    { label: '1 minuto (teste em sala)', valor: '1' },
-    { label: '5 minutos (demonstração)', valor: '5' },
+    { label: '1 minuto', valor: '1' },
+    { label: '5 minutos', valor: '5' },
     { label: '1 dia', valor: '1440' },
     { label: '15 dias (padrão)', valor: '21600' },
   ]

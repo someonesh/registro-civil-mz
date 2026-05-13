@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 import os
 import datetime
 
-PDF_DIR = "pdfs"
+PDF_DIR = "/tmp/pdfs"
 os.makedirs(PDF_DIR, exist_ok=True)
 
 _EMBLEMA_PATH = os.path.join(os.path.dirname(__file__), "emblema.png")

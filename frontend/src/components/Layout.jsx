@@ -28,10 +28,8 @@ export default function Layout() {
           </div>
           <div className="text-right">
             <p className="text-[#A7C4B0] text-[10px] uppercase tracking-widest">Conservador</p>
-            <p className="text-white text-sm font-semibold mt-0.5">Dr. João Carlos Gotoro</p>
+            <p className="text-white text-sm font-semibold mt-0.5">Dr. Rollins da Conceição Chanesa</p>
             <div className="flex items-center justify-end gap-1.5 mt-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80]"></span>
-              <span className="text-[#4ADE80] text-[10px] tracking-wide">Sistema activo</span>
             </div>
           </div>
         </div>
@@ -80,8 +78,12 @@ export default function Layout() {
             </NavLink>
             <NavLink to="/base-dados" className={link}>
             <span className="w-1 h-4 rounded-full bg-current opacity-40 flex-shrink-0"></span>
-            Base de Dados BI
+            Cidadãos Cadastrados
            </NavLink>
+           <NavLink to="/presencial" className={link}>
+            <span className="w-1 h-3 rounded-full bg-current opacity-50 flex-shrink-0"></span>
+            Confirmação Presencial
+            </NavLink>
           </nav>
           <div className="border-t border-[#E2E8F0] px-4 py-4 bg-[#F7FAFC]">
             <p className="text-[10px] text-[#718096] leading-relaxed">

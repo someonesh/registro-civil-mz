@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.hospital import Hospital
@@ -440,3 +442,70 @@ def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
     if not r:
         raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
     return r
+
+
+# Endpoint para o RC completar dados presencialmente (sem api_key)
+class CompletarPresencial(BaseModel):
+    nome_completo: str
+    apelidos: str
+    nome_pai: Optional[str] = None
+    bi_pai: Optional[str] = None
+    naturalidade_pai: Optional[str] = None
+    estado_civil_pai: Optional[str] = None
+    nome_mae: Optional[str] = None
+    bi_mae: Optional[str] = None
+    naturalidade_mae: Optional[str] = None
+    estado_civil_mae: Optional[str] = None
+    avo_paterno: Optional[str] = None
+    avo_paterna: Optional[str] = None
+    avo_materno: Optional[str] = None
+    avo_materna: Optional[str] = None
+    bi_declarante: Optional[str] = None
+    nome_declarante: Optional[str] = None
+    estado_civil_declarante: Optional[str] = None
+    residencia_declarante: Optional[str] = None
+    relacao_declarante: Optional[str] = None
+
+
+@router.post("/{pre_registo_id}/completar")
+def completar_presencial(pre_registo_id: int, dados: CompletarPresencial, db: Session = Depends(get_db)):
+    """Endpoint para o funcionário do RC completar dados presencialmente."""
+    r = db.query(PreRegistoNascimento).filter(
+        PreRegistoNascimento.id == pre_registo_id
+    ).first()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
+
+    if r.status not in ["incompleto"]:
+        raise HTTPException(status_code=400, detail=f"Estado actual '{r.status}' não permite edição.")
+
+    # Actualizar apenas os campos enviados (não sobrescreve com None)
+    if dados.nome_completo: r.nome_completo = dados.nome_completo
+    if dados.apelidos:      r.apelidos      = dados.apelidos
+    if dados.nome_pai:      r.nome_pai      = dados.nome_pai
+    if dados.bi_pai:        r.bi_pai        = dados.bi_pai.upper()
+    if dados.naturalidade_pai:  r.naturalidade_pai  = dados.naturalidade_pai
+    if dados.estado_civil_pai:  r.estado_civil_pai  = dados.estado_civil_pai
+    if dados.nome_mae:      r.nome_mae      = dados.nome_mae
+    if dados.bi_mae:        r.bi_mae        = dados.bi_mae.upper()
+    if dados.naturalidade_mae:  r.naturalidade_mae  = dados.naturalidade_mae
+    if dados.estado_civil_mae:  r.estado_civil_mae  = dados.estado_civil_mae
+    if dados.avo_paterno:   r.avo_paterno   = dados.avo_paterno
+    if dados.avo_paterna:   r.avo_paterna   = dados.avo_paterna
+    if dados.avo_materno:   r.avo_materno   = dados.avo_materno
+    if dados.avo_materna:   r.avo_materna   = dados.avo_materna
+    if dados.bi_declarante:          r.bi_declarante          = dados.bi_declarante.upper()
+    if dados.nome_declarante:        r.nome_declarante        = dados.nome_declarante
+    if dados.estado_civil_declarante:r.estado_civil_declarante= dados.estado_civil_declarante
+    if dados.residencia_declarante:  r.residencia_declarante  = dados.residencia_declarante
+    if dados.relacao_declarante:     r.relacao_declarante     = dados.relacao_declarante
+
+    r.status = "aguarda_aprovacao"
+    db.commit()
+
+    return {
+        "sucesso": True,
+        "status": "aguarda_aprovacao",
+        "mensagem": "Dados completados com sucesso. Processo passa a aguardar aprovação."
+    }
