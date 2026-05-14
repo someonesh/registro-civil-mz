@@ -26,7 +26,7 @@ def autenticar_hospital(api_key: str, db: Session) -> Hospital:
     return hospital
 
 
-# ── NOVO ENDPOINT PARA EDITAR REGISTO (COLOCAR ANTES DOS ENDPOINTS COM /{id}) ──
+# ── ENDPOINT PARA EDITAR REGISTO ──
 class AtualizarRegistoNascimento(BaseModel):
     nome_completo: Optional[str] = None
     apelidos: Optional[str] = None
@@ -52,7 +52,6 @@ def atualizar_registo_nascimento(
     if not registo:
         raise HTTPException(status_code=404, detail="Registo não encontrado.")
     
-    # Atualizar apenas os campos fornecidos
     update_data = dados.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(registo, key, value)
@@ -79,7 +78,6 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
     pai_vivo = True
     mae_viva = True
 
-    # Paternidade: só validar se bi_pai foi enviado
     paternidade_fixada = bool(dados.bi_pai and dados.nome_pai)
 
     if paternidade_fixada:
@@ -90,7 +88,6 @@ def receber_nascimento_fase1(dados: NascimentoFase1, db: Session = Depends(get_d
             bi_pai_valido = True
             pai_vivo = resultado_pai["dados"]["vivo"]
 
-    # Mãe é sempre obrigatória
     resultado_mae = verificar_bi(db, dados.bi_mae, dados.nome_mae)
     if not resultado_mae["valido"]:
         erros.append({"campo": "bi_mae", "mensagem": resultado_mae["mensagem"]})
@@ -215,7 +212,6 @@ def aprovar_nascimento(dados: AprovarNascimento, db: Session = Depends(get_db)):
     nuic = gerar_nuic(db)
     numero_assento = gerar_numero_assento_nascimento(db)
 
-    # Nome do pai: se paternidade não fixada, indicar explicitamente
     nome_pai_registo = pre_registo.nome_pai
     if not pre_registo.paternidade_fixada:
         nome_pai_registo = "Não declarado — paternidade não fixada"
@@ -310,11 +306,6 @@ def rejeitar_nascimento(dados: RejeitarNascimento, db: Session = Depends(get_db)
 
 @router.post("/{pre_registo_id}/reconhecer-paternidade")
 def reconhecer_paternidade(pre_registo_id: int, dados: ReconhecerPaternidade, db: Session = Depends(get_db)):
-    """
-    Permite ao hospital registar o reconhecimento posterior de paternidade.
-    Usado quando o pai se apresenta depois do nascimento para reconhecer a criança.
-    Só aplicável a registos com paternidade_fixada = False.
-    """
     autenticar_hospital(dados.api_key, db)
 
     pre_registo = db.query(PreRegistoNascimento).filter(
@@ -327,12 +318,10 @@ def reconhecer_paternidade(pre_registo_id: int, dados: ReconhecerPaternidade, db
     if pre_registo.paternidade_fixada:
         raise HTTPException(status_code=400, detail="Este registo já tem paternidade fixada.")
 
-    # Validar o BI do pai
     resultado_pai = verificar_bi(db, dados.bi_pai, dados.nome_pai)
     if not resultado_pai["valido"]:
         raise HTTPException(status_code=422, detail=resultado_pai["mensagem"])
 
-    # Actualizar o pré-registo
     pre_registo.bi_pai = dados.bi_pai.upper()
     pre_registo.nome_pai = dados.nome_pai
     pre_registo.estado_civil_pai = dados.estado_civil_pai
@@ -341,7 +330,6 @@ def reconhecer_paternidade(pre_registo_id: int, dados: ReconhecerPaternidade, db
     pre_registo.paternidade_fixada = True
     pre_registo.pai_vivo = resultado_pai["dados"]["vivo"]
 
-    # Se já existe um registo aprovado, actualizar também
     registo = db.query(RegistoNascimento).filter(
         RegistoNascimento.pre_registo_id == pre_registo_id
     ).first()
@@ -358,8 +346,6 @@ def reconhecer_paternidade(pre_registo_id: int, dados: ReconhecerPaternidade, db
         "mensagem": f"Paternidade reconhecida com sucesso. Pai: {dados.nome_pai} ({dados.bi_pai.upper()})"
     }
 
-
-# ── ROTAS DE CONSULTA — fixas antes de /{id} ──
 
 @router.get("/pendentes")
 def listar_pendentes(db: Session = Depends(get_db)):
@@ -482,7 +468,6 @@ def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
     return r
 
 
-# Endpoint para o RC completar dados presencialmente (sem api_key)
 class CompletarPresencial(BaseModel):
     nome_completo: str
     apelidos: str
@@ -507,7 +492,6 @@ class CompletarPresencial(BaseModel):
 
 @router.post("/{pre_registo_id}/completar")
 def completar_presencial(pre_registo_id: int, dados: CompletarPresencial, db: Session = Depends(get_db)):
-    """Endpoint para o funcionário do RC completar dados presencialmente."""
     r = db.query(PreRegistoNascimento).filter(
         PreRegistoNascimento.id == pre_registo_id
     ).first()
@@ -518,7 +502,6 @@ def completar_presencial(pre_registo_id: int, dados: CompletarPresencial, db: Se
     if r.status not in ["incompleto"]:
         raise HTTPException(status_code=400, detail=f"Estado actual '{r.status}' não permite edição.")
 
-    # Actualizar apenas os campos enviados (não sobrescreve com None)
     if dados.nome_completo: r.nome_completo = dados.nome_completo
     if dados.apelidos:      r.apelidos      = dados.apelidos
     if dados.nome_pai:      r.nome_pai      = dados.nome_pai

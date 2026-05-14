@@ -26,7 +26,7 @@ def autenticar_hospital(api_key: str, db: Session) -> Hospital:
     return hospital
 
 
-# ── NOVO ENDPOINT PARA EDITAR REGISTO (COLOCAR ANTES DOS ENDPOINTS COM /{id}) ──
+# ── ENDPOINT PARA EDITAR REGISTO ──
 class AtualizarRegistoObito(BaseModel):
     nome_completo: Optional[str] = None
     sexo: Optional[str] = None
@@ -52,7 +52,6 @@ def atualizar_registo_obito(
     if not registo:
         raise HTTPException(status_code=404, detail="Registo não encontrado.")
     
-    # Atualizar apenas os campos fornecidos
     update_data = dados.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(registo, key, value)
@@ -234,7 +233,6 @@ def aprovar_obito(dados: AprovarObito, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(registo)
 
-    # Gerar PDF
     try:
         from app.services.pdf import gerar_assento_obito
         cfg_conserv = db.query(Configuracao).filter(Configuracao.chave == "nome_conservatoria").first()
@@ -275,8 +273,6 @@ def rejeitar_obito(dados: RejeitarObito, db: Session = Depends(get_db)):
 
     return {"sucesso": True, "mensagem": f"Óbito rejeitado. Motivo: {dados.motivo_rejeicao}"}
 
-
-# ── ROTAS FIXAS ANTES DE /{id} ──
 
 @router.get("/pendentes")
 def listar_pendentes(db: Session = Depends(get_db)):
@@ -346,6 +342,7 @@ def historico_obitos(db: Session = Depends(get_db)):
         ]
     }
 
+
 @router.get("/registados")
 def listar_registados(db: Session = Depends(get_db)):
     registos = db.query(RegistoObito).order_by(
@@ -379,3 +376,4 @@ def detalhe_pre_registo(pre_registo_id: int, db: Session = Depends(get_db)):
     if not r:
         raise HTTPException(status_code=404, detail="Pré-registo não encontrado.")
     return r
+    

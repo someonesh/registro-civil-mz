@@ -16,10 +16,6 @@ export default function Registados() {
   const [registoSelecionado, setRegistoSelecionado] = useState(null)
   const [tipoRegisto, setTipoRegisto] = useState('nascimento')
 
-  useEffect(() => {
-    carregarDados()
-  }, [])
-
   const carregarDados = () => {
     setLoading(true)
     const p1 = api.get('/nascimento/registados')
@@ -36,6 +32,10 @@ export default function Registados() {
       })
     Promise.all([p1, p2]).finally(() => setLoading(false))
   }
+
+  useEffect(() => {
+    carregarDados()
+  }, [])
 
   const refreshData = () => {
     carregarDados()

@@ -111,26 +111,6 @@ export default function ModalEditarRegisto({ isOpen, onClose, tipo, registo, onS
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hora Nascimento</label>
-                <input
-                  type="time"
-                  name="hora_nascimento"
-                  value={formData.hora_nascimento || ''}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Local Nascimento</label>
-                <input
-                  type="text"
-                  name="local_nascimento"
-                  value={formData.local_nascimento || ''}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Pai</label>
                 <input
                   type="text"
@@ -199,42 +179,12 @@ export default function ModalEditarRegisto({ isOpen, onClose, tipo, registo, onS
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hora Falecimento</label>
-                <input
-                  type="time"
-                  name="hora_falecimento"
-                  value={formData.hora_falecimento || ''}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Local Falecimento</label>
-                <input
-                  type="text"
-                  name="local_falecimento"
-                  value={formData.local_falecimento || ''}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Causa da Morte</label>
                 <textarea
                   name="causa_morte"
                   value={formData.causa_morte || ''}
                   onChange={handleChange}
                   rows="2"
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Declarante</label>
-                <input
-                  type="text"
-                  name="nome_declarante"
-                  value={formData.nome_declarante || ''}
-                  onChange={handleChange}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-[#009A44]"
                 />
               </div>
