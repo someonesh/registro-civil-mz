@@ -3,7 +3,7 @@ import logging
 import traceback
 from typing import Optional
 
-import httpx
+import requests as _requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -37,9 +37,8 @@ def _callback_hospital(hospital: Hospital, payload: dict) -> None:
     if not callback_url:
         return
     try:
-        with httpx.Client(timeout=10) as client:
-            resp = client.post(callback_url, json=payload)
-            logger.info("[CALLBACK] POST %s → %s", callback_url, resp.status_code)
+        resp = _requests.post(callback_url, json=payload, timeout=10)
+        logger.info("[CALLBACK] POST %s → %s", callback_url, resp.status_code)
     except Exception as exc:
         logger.error("[CALLBACK ERRO] %s — %s", callback_url, exc)
 

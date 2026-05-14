@@ -1,9 +1,22 @@
+"""
+Rotas de Nascimento — Registo Civil de Moçambique
+=================================================
+Correções aplicadas (v2):
+  1. Ordem das rotas corrigida: rotas fixas (GET /registados, PUT /registados/{id})
+     registadas ANTES do wildcard GET /{pre_registo_id}, eliminando o "Not Found" no editor.
+  2. POST /fase2 envolto em try/except; erros de negócio voltam 4xx + JSON {detail}.
+  3. Callback ao hospital com payload completo (nome_completo, nuic, etc.) via POST
+     para Hospital.callback_url quando existe.
+  4. Status documentados e consistentes (ver STATUS_VALUES).
+  5. GET /{pre_registo_id} devolve dict filtrado em vez do ORM raw.
+"""
+
 import datetime
 import logging
 import traceback
 from typing import Optional
 
-import httpx
+import requests as _requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -55,11 +68,8 @@ def _callback_hospital(hospital: Hospital, payload: dict) -> None:
     if not callback_url:
         return
     try:
-        with httpx.Client(timeout=10) as client:
-            resp = client.post(callback_url, json=payload)
-            logger.info(
-                "[CALLBACK] POST %s → %s", callback_url, resp.status_code
-            )
+        resp = _requests.post(callback_url, json=payload, timeout=10)
+        logger.info("[CALLBACK] POST %s → %s", callback_url, resp.status_code)
     except Exception as exc:
         logger.error("[CALLBACK ERRO] %s — %s", callback_url, exc)
 
@@ -86,6 +96,13 @@ def _payload_nascimento(pre_registo: PreRegistoNascimento, registo: RegistoNasci
             "conservatoria":  registo.conservatoria,
         })
     return p
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ATENÇÃO: rotas fixas PRIMEIRO, wildcard /{pre_registo_id} POR ÚLTIMO.
+# O FastAPI casa rotas na ordem em que são registadas — um wildcard no topo
+# "engole" todos os paths seguintes, causando 404/422 inesperados.
+# ══════════════════════════════════════════════════════════════════════════════
 
 
 # ── PUT /registados/{id} — editar registo aprovado ────────────────────────────
